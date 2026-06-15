@@ -51,53 +51,58 @@ def _preview_table_html(rows):
 st.markdown(
     """
     <style>
-      :root { --med-teal:#1C9C9C; --med-blue:#1C7C9C; --med-ink:#13354B; }
+      @import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@300;400;500;600;700;800&display=swap');
+      /* MedElite brand palette (from medelitegrp.com) */
+      :root { --me-blue:#3993CB; --me-deep:#066AAB; --me-green:#00D084;
+              --me-ink:#32373C; }
+      html, body, [class*="css"], .stApp, button, input, textarea, select {
+        font-family: 'Work Sans', -apple-system, sans-serif !important; }
       .stApp { background:
-        linear-gradient(180deg,#EAF4F8 0%, #F6FBFC 220px, #FFFFFF 520px); }
-      .block-container { padding-top: 1.6rem; }
+        linear-gradient(180deg,#E8F2FA 0%, #F4F9FD 240px, #FFFFFF 560px); }
+      .block-container { padding-top: 1.4rem; }
 
-      .med-topbar { height:6px; border-radius:6px; margin-bottom:14px;
-        background:linear-gradient(90deg,#19B2A6 0%, #1C9C9C 45%, #2C7BE5 100%); }
+      .me-topbar { height:6px; border-radius:6px; margin-bottom:14px;
+        background:linear-gradient(90deg,#3993CB 0%, #066AAB 55%, #00D084 100%); }
 
       .brand-card { background:#FFFFFF; border:1px solid #DCEBF1;
         border-radius:16px; padding:16px 20px 12px; text-align:center;
-        box-shadow:0 4px 16px rgba(20,90,130,.08); }
+        box-shadow:0 6px 20px rgba(57,147,203,.12); }
       .brand-infinite { font-size:36px; font-weight:800; color:#D6007E;
         letter-spacing:1px; line-height:1; }
-      .brand-sub { font-size:15px; font-weight:700; color:#1B75BC; margin-top:-1px; }
-      .brand-tag { color:#1C7C9C; font-size:11px; font-weight:700;
+      .brand-sub { font-size:15px; font-weight:700; color:#066AAB; margin-top:-1px; }
+      .brand-tag { color:#3993CB; font-size:11px; font-weight:700;
         letter-spacing:3px; margin-top:8px; text-transform:uppercase; }
 
       .report-title { text-align:center; font-weight:800; font-size:20px;
-        color:var(--med-ink); margin-top:14px; }
-      .report-state { text-align:center; font-weight:700; color:var(--med-blue);
+        color:var(--me-ink); margin-top:14px; }
+      .report-state { text-align:center; font-weight:700; color:var(--me-blue);
         letter-spacing:2px; margin-bottom:6px; }
 
-      /* section headings get a teal left-accent bar */
-      h3 { border-left:5px solid #1C9C9C; padding-left:10px; color:var(--med-ink); }
+      /* section headings get a brand-blue left-accent bar */
+      h3 { border-left:5px solid #3993CB; padding-left:10px; color:var(--me-deep)
+           !important; font-weight:700; }
 
-      /* star-rating metric cards -> soft clinical cards */
-      div[data-testid="stMetric"] { background:#F1F8FA; border:1px solid #CFE6EC;
+      /* star-rating metric cards -> clean blue cards */
+      div[data-testid="stMetric"] { background:#F1F7FC; border:1px solid #D2E6F4;
         border-radius:12px; padding:10px 8px; text-align:center; }
-      div[data-testid="stMetricValue"] { color:#1C7C9C; }
+      div[data-testid="stMetricValue"] { color:#066AAB; }
 
-      /* primary buttons -> medical blue */
       .stButton>button, .stDownloadButton>button {
         border-radius:10px; font-weight:600; }
 
       /* custom preview table */
       .snap-table { width:100%; border-collapse:collapse; font-size:13.5px;
-        border:1px solid #DCEBF1; border-radius:12px; overflow:hidden; }
-      .snap-table th { background:#1C7C9C; color:#fff; text-align:left;
+        border:1px solid #D2E6F4; border-radius:12px; overflow:hidden; }
+      .snap-table th { background:#3993CB; color:#fff; text-align:left;
         padding:8px 12px; font-weight:700; }
-      .snap-table td { padding:7px 12px; border-top:1px solid #E7F0F4; }
-      .snap-table td.lbl { font-weight:600; color:var(--med-ink); width:58%; }
-      .snap-table tr:nth-child(even) td { background:#F6FBFC; }
-      .snap-sec td { background:#EAF4F8 !important; font-weight:700;
-        color:#1C7C9C; letter-spacing:.5px; text-transform:uppercase;
+      .snap-table td { padding:7px 12px; border-top:1px solid #E8F1F8; }
+      .snap-table td.lbl { font-weight:600; color:var(--me-ink); width:58%; }
+      .snap-table tr:nth-child(even) td { background:#F6FAFD; }
+      .snap-sec td { background:#E6F1F9 !important; font-weight:700;
+        color:#066AAB; letter-spacing:.5px; text-transform:uppercase;
         font-size:11.5px; }
     </style>
-    <div class="med-topbar"></div>
+    <div class="me-topbar"></div>
     <div class="brand-card">
       <div class="brand-infinite">INFINITE</div>
       <div class="brand-sub">Managed by MEDELITE</div>
@@ -199,7 +204,7 @@ if hosp:
                   ("LT", "hosp"): "LT Hospitalization", ("LT", "ed"): "LT ED Visit"}
         cats = [labels[k] for k in keys]
         fig = go.Figure()
-        for series, color in [("facility", "#2C7BE5"), ("state", "#19B2A6"),
+        for series, color in [("facility", "#3993CB"), ("state", "#00D084"),
                               ("nation", "#9FB3C8")]:
             fig.add_bar(name=series.capitalize(), x=cats,
                         y=[_num(hosp[k][series]) for k in keys],
