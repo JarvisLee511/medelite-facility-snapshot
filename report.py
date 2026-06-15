@@ -176,8 +176,32 @@ def render_pdf(snap: dict, manual: dict) -> bytes:
     pdf.cell(0, 5, stamp if pdf._has_unicode else stamp.replace("·", "|"),
              align="L", new_x="LMARGIN", new_y="NEXT")
 
-    out = pdf.output()
-    return bytes(out)
+    return _finalize_pdf(bytes(pdf.output()))
+
+
+def _finalize_pdf(pdf_bytes: bytes) -> bytes:
+    """Re-emit the PDF without the (benign) document-level /OpenAction.
+
+    fpdf2 always writes an /OpenAction that sets the initial view/zoom. A static
+    report needs no auto-action on open, and removing it keeps the file a minimal,
+    purely-static document — which avoids the heuristic flag some AV download
+    scanners raise on freshly generated files. The clickable Care Compare
+    hyperlink and document metadata are preserved. Falls back to the original
+    bytes if anything goes wrong, so a download never fails.
+    """
+    try:
+        from pypdf import PdfReader, PdfWriter
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        writer = PdfWriter()
+        for page in reader.pages:
+            writer.add_page(page)
+        if reader.metadata:
+            writer.add_metadata({str(k): str(v) for k, v in reader.metadata.items()})
+        buf = io.BytesIO()
+        writer.write(buf)
+        return buf.getvalue()
+    except Exception:
+        return pdf_bytes
 
 
 # --- Word (.docx) ------------------------------------------------------------
