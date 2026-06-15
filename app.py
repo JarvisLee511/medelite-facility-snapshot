@@ -45,6 +45,25 @@ def _preview_table_html(rows):
     out.append("</table>")
     return "".join(out)
 
+
+def _rating_cards_html(ratings):
+    """Color-coded star-rating cards (green 4-5 / amber 3 / red 1-2 / grey N/A)."""
+    labels = [("Overall", "overall"), ("Health Insp.", "health_inspection"),
+              ("Staffing", "staffing"), ("Quality of Care", "quality")]
+    cards = []
+    for lab, key in labels:
+        v = ratings.get(key)
+        if str(v).isdigit():
+            n = int(v)
+            cls = "r-good" if n >= 4 else "r-mid" if n == 3 else "r-low"
+            stars = "★" * n + "☆" * (5 - n)
+            val = f"{n}<span class='r-out'>/5</span>"
+        else:
+            cls, stars, val = "r-na", "", "N/A"
+        cards.append(f"<div class='rating-card {cls}'><div class='r-lab'>{lab}</div>"
+                     f"<div class='r-val'>{val}</div><div class='r-stars'>{stars}</div></div>")
+    return "<div class='rating-grid'>" + "".join(cards) + "</div>"
+
 # --- branding (hard-coded; never overwritten by facility data) ---------------
 # Light, clinical look: soft blue-white canvas + medical teal/blue accents.
 # The INFINITE / MEDELITE banner colors are brand-locked and kept as-is.
@@ -101,6 +120,48 @@ st.markdown(
       .snap-sec td { background:#E6F1F9 !important; font-weight:700;
         color:#066AAB; letter-spacing:.5px; text-transform:uppercase;
         font-size:11.5px; }
+
+      /* welcome / empty state */
+      .welcome { background:#FFFFFF; border:1px solid #DCEBF1; border-radius:16px;
+        padding:26px 28px; margin-top:10px; box-shadow:0 6px 20px rgba(57,147,203,.08);}
+      .w-title { font-size:22px; font-weight:800; color:#066AAB; }
+      .w-sub { color:#51606b; font-size:14px; margin:8px 0 16px; max-width:680px;
+        line-height:1.55; }
+      .w-steps { display:flex; gap:10px; flex-wrap:wrap; }
+      .w-step { flex:1; min-width:190px; background:#F4F9FD; border:1px solid #E0EDF6;
+        border-radius:12px; padding:12px 14px; font-size:13.5px; color:#32373C;
+        font-weight:600; }
+      .w-step span { display:inline-flex; width:22px; height:22px; border-radius:50%;
+        background:#3993CB; color:#fff; align-items:center; justify-content:center;
+        font-size:12px; margin-right:8px; }
+
+      /* report header band */
+      .rpt-head { text-align:center; margin-bottom:8px; }
+      .rpt-h-title { font-weight:800; font-size:20px; color:var(--me-ink);
+        letter-spacing:.3px; }
+      .rpt-h-name { color:#51606b; font-size:13.5px; font-weight:600; margin-top:2px; }
+      .asof-pill { display:inline-block; margin-top:8px; background:#E6F1F9;
+        color:#066AAB; font-size:11px; font-weight:700; letter-spacing:.5px;
+        padding:3px 11px; border-radius:999px; border:1px solid #CFE3F2; }
+
+      /* color-coded rating cards */
+      .rating-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px;
+        margin:14px 0 16px; }
+      .rating-card { border-radius:12px; padding:12px 8px; text-align:center;
+        background:#fff; border:1px solid #E2EAF0;
+        box-shadow:0 2px 8px rgba(20,90,130,.05); }
+      .r-lab { font-size:12px; color:#5b6b78; font-weight:600; }
+      .r-val { font-size:30px; font-weight:800; line-height:1.1; color:#066AAB; }
+      .r-out { font-size:14px; color:#9aa7b2; font-weight:600; }
+      .r-stars { font-size:14px; letter-spacing:1px; margin-top:2px; }
+      .r-good .r-stars { color:#0E9F6E; }
+      .r-mid  .r-stars { color:#E0A800; }
+      .r-low  .r-stars { color:#E5544B; }
+      .r-na   .r-val   { color:#9aa7b2; font-size:22px; }
+
+      /* footer */
+      .me-footer { text-align:center; color:#90a0ac; font-size:11.5px;
+        margin-top:26px; padding-top:12px; border-top:1px solid #E8F1F8; }
     </style>
     <div class="me-topbar"></div>
     <div class="brand-card">
@@ -116,7 +177,7 @@ st.markdown(
 col_in, col_btn = st.columns([4, 1])
 with col_in:
     ccn = st.text_input("CMS Certification Number (CCN)",
-                        placeholder="e.g. 686123  (Kendall Lakes Healthcare and Rehab Center, FL)",
+                        placeholder="Enter a 6-character CCN (e.g. 455001)",
                         max_chars=6).strip()
 with col_btn:
     st.write("")
@@ -142,8 +203,22 @@ snap = st.session_state.get("snap")
 
 # --- main: inputs (left) + live preview (right) ------------------------------
 if not snap:
-    st.info("Enter a valid CCN above and click **Fetch facility** to begin. "
-            "Try **686123** for the sample facility.")
+    st.markdown(
+        """
+        <div class="welcome">
+          <div class="w-title">Generate a facility assessment in seconds</div>
+          <div class="w-sub">Enter a CMS Certification Number above to pull live facility
+            data from the CMS Provider Data Catalog, layer in your internal operational
+            notes, and export a polished, branded report.</div>
+          <div class="w-steps">
+            <div class="w-step"><span>1</span> Enter a CCN &amp; fetch live CMS data</div>
+            <div class="w-step"><span>2</span> Add internal operational inputs</div>
+            <div class="w-step"><span>3</span> Download the PDF or Word report</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.stop()
 
 left, right = st.columns([1, 1.35], gap="large")
@@ -176,17 +251,20 @@ manual = {
 }
 
 with right:
-    st.markdown(f"<div class='report-title'>{rpt.REPORT_TITLE}</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='report-state'>{snap['state']}</div>", unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class="rpt-head">
+          <div class="rpt-h-title">{rpt.REPORT_TITLE}</div>
+          <div class="rpt-h-name">{html.escape(rpt.resolve_display_name(snap, manual))}
+            · {snap['state']}</div>
+          <span class="asof-pill">DATA AS OF {snap['processing_date']}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    # star ratings as quick metric cards
-    r = snap["ratings"]
-    m1, m2, m3, m4 = st.columns(4)
-    for col, label, key in [(m1, "Overall", "overall"), (m2, "Health Insp.", "health_inspection"),
-                            (m3, "Staffing", "staffing"), (m4, "Quality", "quality")]:
-        val = r.get(key) or "N/A"
-        stars = "★" * int(val) + "☆" * (5 - int(val)) if str(val).isdigit() else ""
-        col.metric(label, f"{val}/5" if str(val).isdigit() else "N/A", stars)
+    # color-coded star-rating cards
+    st.markdown(_rating_cards_html(snap["ratings"]), unsafe_allow_html=True)
 
     # full report preview table (section-grouped, clinical styling)
     rows = rpt.build_report_rows(snap, manual)
@@ -222,6 +300,7 @@ if hosp:
 
 # --- downloads + provenance --------------------------------------------------
 st.divider()
+st.subheader("Export Report")
 display_name = rpt.resolve_display_name(snap, manual)
 safe = re.sub(r"[^A-Za-z0-9]+", "_", display_name).strip("_") or "facility"
 d1, d2, d3 = st.columns([1, 1, 2])
@@ -236,3 +315,9 @@ with d3:
     st.markdown(f"[View official CMS Care Compare profile →]({snap['care_compare_url']})")
     st.caption(f"Data as of {snap['processing_date']} · Source: CMS Provider Data "
                "Catalog (data.cms.gov)")
+
+st.markdown(
+    "<div class='me-footer'>INFINITE — Managed by MEDELITE · "
+    "Live data from the CMS Provider Data Catalog (data.cms.gov)</div>",
+    unsafe_allow_html=True,
+)
