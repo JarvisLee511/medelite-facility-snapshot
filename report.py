@@ -34,7 +34,7 @@ SECTION_BG = (230, 241, 249)
 SECTION_TX = (6, 106, 171)
 ZEBRA = (246, 250, 253)
 VALUE_TX = (70, 80, 90)
-BORDER = (223, 236, 245)
+BORDER = (188, 210, 228)   # visible grid / column divider
 
 _FONT_DIR = os.path.join(os.path.dirname(__file__), "assets", "fonts")
 
@@ -61,6 +61,12 @@ def resolve_display_name(snap: dict, manual: dict) -> str:
     return override if override else snap.get("legal_name", "")
 
 
+def _dash(v) -> str:
+    """Show an em dash for blank fields so the report reads as intentional."""
+    s = "" if v is None else str(v)
+    return s if s.strip() else "—"
+
+
 def build_report_rows(snap: dict, manual: dict) -> list[tuple[str, str]]:
     """Ordered (label, value) rows — the single source of truth for both exports."""
     rows = [
@@ -78,6 +84,7 @@ def build_report_rows(snap: dict, manual: dict) -> list[tuple[str, str]]:
         ("Staffing", str(snap["ratings"].get("staffing", "") or "")),
         ("Quality of Resident Care", str(snap["ratings"].get("quality", "") or "")),
     ]
+    rows = [(label, _dash(value)) for label, value in rows]
     hosp = snap.get("hospitalization")
     if hosp:
         for label, key, slot, kind in _HOSP_LAYOUT:
@@ -159,15 +166,17 @@ def render_pdf(snap: dict, manual: dict) -> bytes:
     sections = {0: "Facility Profile", 9: "CMS Star Ratings",
                 13: "Hospitalization & ED Metrics"}
     pdf.set_draw_color(*BORDER)
-    pdf.set_line_width(0.2)
+    pdf.set_line_width(0.25)
 
-    # column header
+    # column header (boxed; right border on Field = the column divider)
     pdf.set_x(x0)
     pdf.set_font(fam, "B", 9.5)
     pdf.set_fill_color(*TABLE_HEADER)
     pdf.set_text_color(255, 255, 255)
-    pdf.cell(label_w, row_h + 0.6, "  Field", fill=True, new_x="RIGHT", new_y="TOP")
-    pdf.cell(value_w, row_h + 0.6, "Value", fill=True, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(label_w, row_h + 0.6, "  Field", border="LTRB", fill=True,
+             new_x="RIGHT", new_y="TOP")
+    pdf.cell(value_w, row_h + 0.6, "Value", border="TRB", fill=True,
+             new_x="LMARGIN", new_y="NEXT")
 
     for i, (label, value) in enumerate(rows):
         if i in sections:
@@ -175,20 +184,22 @@ def render_pdf(snap: dict, manual: dict) -> bytes:
             pdf.set_font(fam, "B", 8)
             pdf.set_fill_color(*SECTION_BG)
             pdf.set_text_color(*SECTION_TX)
-            pdf.cell(full_w, sec_h, "  " + sections[i].upper(), fill=True,
-                     new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(full_w, sec_h, "  " + sections[i].upper(), border="LRB",
+                     fill=True, new_x="LMARGIN", new_y="NEXT")
         pdf.set_fill_color(*(ZEBRA if i % 2 == 0 else (255, 255, 255)))
         y0 = pdf.get_y()
         pdf.set_x(x0)
         pdf.set_font(fam, "B", 9)
         pdf.set_text_color(*DARK)
-        pdf.multi_cell(label_w, row_h, "  " + label, border="B", align="L", fill=True,
-                       new_x="RIGHT", new_y="TOP", max_line_height=4)
+        # label cell: left outer + right divider + bottom
+        pdf.multi_cell(label_w, row_h, "  " + label, border="LRB", align="L",
+                       fill=True, new_x="RIGHT", new_y="TOP", max_line_height=4)
         pdf.set_xy(x0 + label_w, y0)
         pdf.set_font(fam, "", 9)
         pdf.set_text_color(*VALUE_TX)
-        pdf.multi_cell(value_w, row_h, str(value), border="B", align="L", fill=True,
-                       new_x="LMARGIN", new_y="NEXT", max_line_height=4)
+        # value cell: right outer + bottom
+        pdf.multi_cell(value_w, row_h, str(value), border="RB", align="L",
+                       fill=True, new_x="LMARGIN", new_y="NEXT", max_line_height=4)
 
     # --- clickable Medicare source hyperlink (dynamic CCN) ---
     pdf.ln(4)
