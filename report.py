@@ -25,10 +25,16 @@ from cms_client import fmt_metric
 BRAND_PLATFORM = "INFINITE"
 BRAND_LINE = "INFINITE — Managed by MEDELITE"   # em dash, exact per brief
 REPORT_TITLE = "FACILITY ASSESSMENT SNAPSHOT"
-MAGENTA = (214, 0, 126)
-BLUE = (27, 117, 188)
+MAGENTA = (214, 0, 126)       # INFINITE brand
+BLUE = (57, 147, 203)         # MedElite #3993CB
+DEEP = (6, 106, 171)          # MedElite #066AAB
 DARK = (33, 37, 41)
-ROW_ALT = (244, 246, 248)
+TABLE_HEADER = (57, 147, 203)
+SECTION_BG = (230, 241, 249)
+SECTION_TX = (6, 106, 171)
+ZEBRA = (246, 250, 253)
+VALUE_TX = (70, 80, 90)
+BORDER = (223, 236, 245)
 
 _FONT_DIR = os.path.join(os.path.dirname(__file__), "assets", "fonts")
 
@@ -89,10 +95,12 @@ class _SnapshotPDF(FPDF):
         self.set_margins(18, 16, 18)
 
     def _register_fonts(self) -> bool:
+        # Carlito: open-source, metrically identical to Calibri (legal to bundle
+        # in a public repo and present on the Linux deploy host, unlike Calibri).
         try:
-            self.add_font("DejaVu", "", os.path.join(_FONT_DIR, "DejaVuSans.ttf"))
-            self.add_font("DejaVu", "B", os.path.join(_FONT_DIR, "DejaVuSans-Bold.ttf"))
-            self.font_family_name = "DejaVu"
+            self.add_font("Calibri", "", os.path.join(_FONT_DIR, "Carlito-Regular.ttf"))
+            self.add_font("Calibri", "B", os.path.join(_FONT_DIR, "Carlito-Bold.ttf"))
+            self.font_family_name = "Calibri"
             return True
         except Exception:
             self.font_family_name = "Helvetica"   # graceful fallback
@@ -143,38 +151,57 @@ def render_pdf(snap: dict, manual: dict) -> bytes:
     pdf.add_page()
     fam = pdf.font_family_name
 
-    label_w, value_w = 96, pdf.w - 36 - 96
-    line_h = 7.6
+    x0 = pdf.l_margin
+    label_w = 96
+    value_w = pdf.w - pdf.l_margin - pdf.r_margin - label_w
+    full_w = label_w + value_w
+    row_h, sec_h = 6.5, 5.7
+    sections = {0: "Facility Profile", 9: "CMS Star Ratings",
+                13: "Hospitalization & ED Metrics"}
+    pdf.set_draw_color(*BORDER)
+    pdf.set_line_width(0.2)
+
+    # column header
+    pdf.set_x(x0)
+    pdf.set_font(fam, "B", 9.5)
+    pdf.set_fill_color(*TABLE_HEADER)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(label_w, row_h + 0.6, "  Field", fill=True, new_x="RIGHT", new_y="TOP")
+    pdf.cell(value_w, row_h + 0.6, "Value", fill=True, new_x="LMARGIN", new_y="NEXT")
+
     for i, (label, value) in enumerate(rows):
-        fill = i % 2 == 1
-        if fill:
-            pdf.set_fill_color(*ROW_ALT)
+        if i in sections:
+            pdf.set_x(x0)
+            pdf.set_font(fam, "B", 8)
+            pdf.set_fill_color(*SECTION_BG)
+            pdf.set_text_color(*SECTION_TX)
+            pdf.cell(full_w, sec_h, "  " + sections[i].upper(), fill=True,
+                     new_x="LMARGIN", new_y="NEXT")
+        pdf.set_fill_color(*(ZEBRA if i % 2 == 0 else (255, 255, 255)))
         y0 = pdf.get_y()
-        pdf.set_font(fam, "B", 9.5)
+        pdf.set_x(x0)
+        pdf.set_font(fam, "B", 9)
         pdf.set_text_color(*DARK)
-        pdf.multi_cell(label_w, line_h, label, border="LTB" if i == 0 else "LB",
-                       align="L", fill=fill, new_x="RIGHT", new_y="TOP",
-                       max_line_height=4.2)
-        pdf.set_xy(18 + label_w, y0)
-        pdf.set_font(fam, "", 9.5)
-        pdf.set_text_color(60, 60, 60)
-        pdf.multi_cell(value_w, line_h, str(value), border="RTB" if i == 0 else "RB",
-                       align="L", fill=fill, new_x="LMARGIN", new_y="NEXT",
-                       max_line_height=4.2)
+        pdf.multi_cell(label_w, row_h, "  " + label, border="B", align="L", fill=True,
+                       new_x="RIGHT", new_y="TOP", max_line_height=4)
+        pdf.set_xy(x0 + label_w, y0)
+        pdf.set_font(fam, "", 9)
+        pdf.set_text_color(*VALUE_TX)
+        pdf.multi_cell(value_w, row_h, str(value), border="B", align="L", fill=True,
+                       new_x="LMARGIN", new_y="NEXT", max_line_height=4)
 
     # --- clickable Medicare source hyperlink (dynamic CCN) ---
-    pdf.ln(5)
+    pdf.ln(4)
     url = snap.get("care_compare_url", "")
     pdf.set_font(fam, "B", 9.5)
-    pdf.set_text_color(*BLUE)
-    pdf.cell(0, 6, "View official CMS Care Compare profile  →", align="L",
+    pdf.set_text_color(*DEEP)
+    pdf.cell(0, 6, "View official CMS Care Compare profile  >", align="L",
              link=url, new_x="LMARGIN", new_y="NEXT")
     pdf.set_font(fam, "", 7.5)
     pdf.set_text_color(120, 120, 120)
     proc = snap.get("processing_date", "")
-    stamp = f"Data as of {proc} · Source: CMS Provider Data Catalog (data.cms.gov)"
-    pdf.cell(0, 5, stamp if pdf._has_unicode else stamp.replace("·", "|"),
-             align="L", new_x="LMARGIN", new_y="NEXT")
+    stamp = f"Data as of {proc} | Source: CMS Provider Data Catalog (data.cms.gov)"
+    pdf.cell(0, 5, stamp, align="L", new_x="LMARGIN", new_y="NEXT")
 
     return _finalize_pdf(bytes(pdf.output()))
 
@@ -212,6 +239,7 @@ def render_docx(snap: dict, manual: dict) -> bytes:
 
     rows = build_report_rows(snap, manual)
     d = docx.Document()
+    d.styles["Normal"].font.name = "Calibri"  # Word ships Calibri natively
 
     def _center(p):
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER

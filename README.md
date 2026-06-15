@@ -72,9 +72,11 @@ All three are queried server-side via the PDC datastore query endpoint
   stored as wide columns whose names carry a CMS-generated hash suffix (e.g.
   `..._1d02`) that can change on a data refresh. They are resolved **dynamically by
   a stable descriptive prefix** rather than hard-coded, so a refresh won't break the app.
-- **Embedded Unicode font.** The PDF embeds DejaVu Sans so the exact banner
-  (`INFINITE — Managed by MEDELITE`, with an em dash) and any special characters in
-  facility names render reliably across platforms.
+- **Embedded Calibri-compatible font.** The PDF embeds **Carlito** — an open-source
+  (OFL) font that is metrically identical to Calibri — so the report looks like
+  Calibri while remaining legal to bundle in a public repo and available on the
+  Linux deploy host (real Calibri is proprietary and not installed there). The Word
+  export names Calibri directly, which Word supplies natively.
 - **Branding guardrail.** The platform banner `INFINITE — Managed by MEDELITE` is a
   hard-coded constant and is **never** replaced by the CMS/override facility name;
   the facility name appears only in the report body under "Name of Facility".
@@ -123,7 +125,7 @@ medelite-facility-snapshot/
 ├── app.py            # Streamlit UI (thin; no business logic)
 ├── cms_client.py     # CMS Provider Data Catalog access + field mapping
 ├── report.py         # PDF (fpdf2) + Word (python-docx) renderers
-├── assets/fonts/     # bundled DejaVu Sans (Unicode PDF font)
+├── assets/fonts/     # bundled Carlito (open-source Calibri-compatible PDF font)
 ├── requirements.txt
 └── README.md
 ```
