@@ -9,6 +9,7 @@ all document rendering lives in report.py, so the app stays thin and testable.
 The CMS API is called server-side here, so there is no browser CORS issue.
 """
 
+import html
 import re
 
 import plotly.graph_objects as go
@@ -28,24 +29,80 @@ def _num(v):
     except (TypeError, ValueError):
         return None
 
+
+def _preview_table_html(rows):
+    """Render the report rows as a clean, section-grouped clinical HTML table."""
+    # rows are fixed order: 0-8 profile, 9-12 ratings, 13-24 hospitalization
+    sections = [(0, "Facility Profile"), (9, "CMS Star Ratings"),
+                (13, "Hospitalization & ED Metrics")]
+    starts = dict(sections)
+    out = ["<table class='snap-table'><tr><th>Field</th><th>Value</th></tr>"]
+    for i, (label, value) in enumerate(rows):
+        if i in starts:
+            out.append(f"<tr class='snap-sec'><td>{starts[i]}</td><td></td></tr>")
+        out.append(f"<tr><td class='lbl'>{html.escape(str(label))}</td>"
+                   f"<td>{html.escape(str(value))}</td></tr>")
+    out.append("</table>")
+    return "".join(out)
+
 # --- branding (hard-coded; never overwritten by facility data) ---------------
+# Light, clinical look: soft blue-white canvas + medical teal/blue accents.
+# The INFINITE / MEDELITE banner colors are brand-locked and kept as-is.
 st.markdown(
     """
     <style>
-      .brand-wrap {text-align:center; padding:6px 0 2px 0;}
-      .brand-infinite {font-size:34px; font-weight:800; color:#D6007E;
-                       letter-spacing:1px; line-height:1;}
-      .brand-sub {font-size:15px; font-weight:700; color:#1B75BC; margin-top:-2px;}
-      .brand-rule {border:none; border-top:2px solid #1B75BC; margin:8px 0 4px 0;}
-      .report-title {text-align:center; font-weight:800; font-size:20px;
-                     color:#212529; margin-top:6px;}
-      .report-state {text-align:center; font-weight:700; color:#212529;}
+      :root { --med-teal:#1C9C9C; --med-blue:#1C7C9C; --med-ink:#13354B; }
+      .stApp { background:
+        linear-gradient(180deg,#EAF4F8 0%, #F6FBFC 220px, #FFFFFF 520px); }
+      .block-container { padding-top: 1.6rem; }
+
+      .med-topbar { height:6px; border-radius:6px; margin-bottom:14px;
+        background:linear-gradient(90deg,#19B2A6 0%, #1C9C9C 45%, #2C7BE5 100%); }
+
+      .brand-card { background:#FFFFFF; border:1px solid #DCEBF1;
+        border-radius:16px; padding:16px 20px 12px; text-align:center;
+        box-shadow:0 4px 16px rgba(20,90,130,.08); }
+      .brand-infinite { font-size:36px; font-weight:800; color:#D6007E;
+        letter-spacing:1px; line-height:1; }
+      .brand-sub { font-size:15px; font-weight:700; color:#1B75BC; margin-top:-1px; }
+      .brand-tag { color:#1C7C9C; font-size:11px; font-weight:700;
+        letter-spacing:3px; margin-top:8px; text-transform:uppercase; }
+
+      .report-title { text-align:center; font-weight:800; font-size:20px;
+        color:var(--med-ink); margin-top:14px; }
+      .report-state { text-align:center; font-weight:700; color:var(--med-blue);
+        letter-spacing:2px; margin-bottom:6px; }
+
+      /* section headings get a teal left-accent bar */
+      h3 { border-left:5px solid #1C9C9C; padding-left:10px; color:var(--med-ink); }
+
+      /* star-rating metric cards -> soft clinical cards */
+      div[data-testid="stMetric"] { background:#F1F8FA; border:1px solid #CFE6EC;
+        border-radius:12px; padding:10px 8px; text-align:center; }
+      div[data-testid="stMetricValue"] { color:#1C7C9C; }
+
+      /* primary buttons -> medical blue */
+      .stButton>button, .stDownloadButton>button {
+        border-radius:10px; font-weight:600; }
+
+      /* custom preview table */
+      .snap-table { width:100%; border-collapse:collapse; font-size:13.5px;
+        border:1px solid #DCEBF1; border-radius:12px; overflow:hidden; }
+      .snap-table th { background:#1C7C9C; color:#fff; text-align:left;
+        padding:8px 12px; font-weight:700; }
+      .snap-table td { padding:7px 12px; border-top:1px solid #E7F0F4; }
+      .snap-table td.lbl { font-weight:600; color:var(--med-ink); width:58%; }
+      .snap-table tr:nth-child(even) td { background:#F6FBFC; }
+      .snap-sec td { background:#EAF4F8 !important; font-weight:700;
+        color:#1C7C9C; letter-spacing:.5px; text-transform:uppercase;
+        font-size:11.5px; }
     </style>
-    <div class="brand-wrap">
+    <div class="med-topbar"></div>
+    <div class="brand-card">
       <div class="brand-infinite">INFINITE</div>
       <div class="brand-sub">Managed by MEDELITE</div>
+      <div class="brand-tag">&#9877;&nbsp; Healthcare Facility Intelligence</div>
     </div>
-    <hr class="brand-rule"/>
     """,
     unsafe_allow_html=True,
 )
@@ -126,9 +183,9 @@ with right:
         stars = "★" * int(val) + "☆" * (5 - int(val)) if str(val).isdigit() else ""
         col.metric(label, f"{val}/5" if str(val).isdigit() else "N/A", stars)
 
-    # full report preview table
+    # full report preview table (section-grouped, clinical styling)
     rows = rpt.build_report_rows(snap, manual)
-    st.table({"Field": [a for a, _ in rows], "Value": [b for _, b in rows]})
+    st.markdown(_preview_table_html(rows), unsafe_allow_html=True)
 
 # --- bonus: hospitalization / ED comparison charts ---------------------------
 hosp = snap.get("hospitalization")
@@ -142,13 +199,15 @@ if hosp:
                   ("LT", "hosp"): "LT Hospitalization", ("LT", "ed"): "LT ED Visit"}
         cats = [labels[k] for k in keys]
         fig = go.Figure()
-        for series, color in [("facility", "#D6007E"), ("state", "#1B75BC"),
-                              ("nation", "#9aa0a6")]:
+        for series, color in [("facility", "#2C7BE5"), ("state", "#19B2A6"),
+                              ("nation", "#9FB3C8")]:
             fig.add_bar(name=series.capitalize(), x=cats,
                         y=[_num(hosp[k][series]) for k in keys],
                         marker_color=color)
         fig.update_layout(barmode="group", title=title, height=340,
                           yaxis_title=suffix, legend_title_text="",
+                          plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                          font=dict(color="#13354B"),
                           margin=dict(t=40, b=10, l=10, r=10))
         container.plotly_chart(fig, use_container_width=True)
 
