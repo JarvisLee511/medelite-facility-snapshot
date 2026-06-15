@@ -127,8 +127,19 @@ class _SnapshotPDF(FPDF):
 
 
 def render_pdf(snap: dict, manual: dict) -> bytes:
+    from datetime import datetime
+
     rows = build_report_rows(snap, manual)
     pdf = _SnapshotPDF(snap.get("state", ""))
+    # Proper document metadata: makes the file a legitimate, identifiable PDF
+    # (also reduces heuristic false-positives from aggressive AV download scanners).
+    disp = resolve_display_name(snap, manual)
+    pdf.set_title(f"Facility Assessment Snapshot - {disp}")
+    pdf.set_author("INFINITE - Managed by MEDELITE")
+    pdf.set_subject("CMS skilled nursing facility assessment report")
+    pdf.set_creator("Facility Assessment Snapshot")
+    pdf.set_producer("Facility Assessment Snapshot (fpdf2)")
+    pdf.set_creation_date(datetime.now())
     pdf.add_page()
     fam = pdf.font_family_name
 
