@@ -9,8 +9,15 @@ Care Compare profile.
 
 > Built for the Medelite technical case study (Facility Assessment Report Generator).
 
-**🔗 Live app:** _add your Streamlit Cloud URL here after deploying_
-**💻 Repository:** _add your public repo URL here_
+**🔗 Live app:** https://medelite-facility-snapshot.streamlit.app/
+**💻 Repository:** https://github.com/JarvisLee511/medelite-facility-snapshot
+
+**Validation target — CCN `686123` (Kendall Lakes Healthcare and Rehab Center, FL):**
+the facility name, address, state, CCN, the report layout, and the Care Compare
+source URL all match the provided sample exactly. The star ratings, certified-bed
+count, and hospitalization/ED figures reflect the **current** CMS data (stamped
+*Data as of 2026-05-01*) and therefore differ from the sample, which was generated
+from an earlier CMS refresh — see Assumption #1 below.
 
 ---
 
