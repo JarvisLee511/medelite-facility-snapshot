@@ -46,23 +46,31 @@ def _preview_table_html(rows):
     return "".join(out)
 
 
+def _rating_band(v):
+    """-> (css-class, star-string, value-html) color-coded by rating band."""
+    if str(v).isdigit():
+        n = int(v)
+        cls = "r-good" if n >= 4 else "r-mid" if n == 3 else "r-low"
+        return cls, "★" * n + "☆" * (5 - n), f"{n}<span class='r-out'>/5</span>"
+    return "r-na", "", "N/A"
+
+
 def _rating_cards_html(ratings):
-    """Color-coded star-rating cards (green 4-5 / amber 3 / red 1-2 / grey N/A)."""
-    labels = [("Overall", "overall"), ("Health Insp.", "health_inspection"),
-              ("Staffing", "staffing"), ("Quality of Care", "quality")]
+    """Hero Overall card + the 3 component cards (color-coded by band)."""
+    ocls, ostars, oval = _rating_band(ratings.get("overall"))
+    hero = (f"<div class='rating-hero {ocls}'>"
+            f"<div><div class='hero-lab'>CMS Overall Rating</div>"
+            f"<div class='hero-val'>{oval}</div></div>"
+            f"<div class='hero-stars'>{ostars}</div></div>")
+    comps = [("Health Insp.", "health_inspection"), ("Staffing", "staffing"),
+             ("Quality of Care", "quality")]
     cards = []
-    for lab, key in labels:
-        v = ratings.get(key)
-        if str(v).isdigit():
-            n = int(v)
-            cls = "r-good" if n >= 4 else "r-mid" if n == 3 else "r-low"
-            stars = "★" * n + "☆" * (5 - n)
-            val = f"{n}<span class='r-out'>/5</span>"
-        else:
-            cls, stars, val = "r-na", "", "N/A"
+    for lab, key in comps:
+        cls, stars, val = _rating_band(ratings.get(key))
         cards.append(f"<div class='rating-card {cls}'><div class='r-lab'>{lab}</div>"
                      f"<div class='r-val'>{val}</div><div class='r-stars'>{stars}</div></div>")
-    return "<div class='rating-grid'>" + "".join(cards) + "</div>"
+    return (hero + "<div class='comp-cap'>Components of the overall rating</div>"
+            + "<div class='rating-grid-3'>" + "".join(cards) + "</div>")
 
 # --- branding (hard-coded; never overwritten by facility data) ---------------
 # Light, clinical look: soft blue-white canvas + medical teal/blue accents.
@@ -158,6 +166,24 @@ st.markdown(
       .r-mid  .r-stars { color:#E0A800; }
       .r-low  .r-stars { color:#E5544B; }
       .r-na   .r-val   { color:#9aa7b2; font-size:22px; }
+
+      /* hero Overall card */
+      .rating-hero { display:flex; align-items:center; justify-content:space-between;
+        background:linear-gradient(135deg,#EAF4FB,#F6FBFE); border:2px solid #3993CB;
+        border-radius:14px; padding:14px 22px; margin:14px 0 4px;
+        box-shadow:0 5px 18px rgba(57,147,203,.16); }
+      .hero-lab { font-size:12px; font-weight:700; letter-spacing:2px; color:#066AAB;
+        text-transform:uppercase; }
+      .hero-val { font-size:42px; font-weight:800; color:#066AAB; line-height:1.05; }
+      .hero-val .r-out { font-size:18px; }
+      .hero-stars { font-size:30px; letter-spacing:3px; color:#9aa7b2; }
+      .rating-hero.r-good .hero-stars { color:#0E9F6E; }
+      .rating-hero.r-mid  .hero-stars { color:#E0A800; }
+      .rating-hero.r-low  .hero-stars { color:#E5544B; }
+      .comp-cap { font-size:10.5px; color:#7b8a96; font-weight:700; letter-spacing:1px;
+        text-transform:uppercase; margin:10px 0 4px; }
+      .rating-grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
+        margin-bottom:16px; }
 
       /* footer */
       .me-footer { text-align:center; color:#90a0ac; font-size:11.5px;
