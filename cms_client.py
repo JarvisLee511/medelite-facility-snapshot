@@ -26,6 +26,8 @@ Design notes / engineering choices (defensible in the walkthrough):
 
 from __future__ import annotations
 
+import time
+
 import requests
 
 # --- PDC datastore endpoint + dataset distribution ids -----------------------
@@ -64,16 +66,28 @@ class FacilityNotFound(Exception):
 
 
 def _query(distribution: str, conditions: list[dict] | None = None,
-           limit: int | None = None) -> list[dict]:
-    """POST a conditions query to the PDC datastore and return result rows."""
+           limit: int | None = None, retries: int = 2) -> list[dict]:
+    """POST a conditions query to the PDC datastore and return result rows.
+
+    Retries transient network/5xx failures with a short backoff so a brief CMS
+    hiccup doesn't fail the whole lookup.
+    """
     payload: dict = {}
     if conditions:
         payload["conditions"] = conditions
     if limit:
         payload["limit"] = limit
-    resp = requests.post(f"{BASE}/{distribution}", json=payload, timeout=TIMEOUT)
-    resp.raise_for_status()
-    return resp.json().get("results", [])
+    last_err: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            resp = requests.post(f"{BASE}/{distribution}", json=payload, timeout=TIMEOUT)
+            resp.raise_for_status()
+            return resp.json().get("results", [])
+        except requests.RequestException as err:
+            last_err = err
+            if attempt < retries:
+                time.sleep(0.6 * (attempt + 1))
+    raise last_err  # type: ignore[misc]
 
 
 def _eq(prop: str, value: str) -> dict:

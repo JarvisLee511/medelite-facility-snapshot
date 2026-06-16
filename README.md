@@ -12,6 +12,8 @@ Care Compare profile.
 **🔗 Live app:** https://medelite-facility-snapshot.streamlit.app/
 **💻 Repository:** https://github.com/JarvisLee511/medelite-facility-snapshot
 
+![Facility Assessment Snapshot — live CMS data, color-coded ratings, one-click report export](assets/screenshot.png)
+
 **Validation target — CCN `686123` (Kendall Lakes Healthcare and Rehab Center, FL):**
 the facility name, address, state, CCN, the report layout, and the Care Compare
 source URL all match the provided sample exactly. The star ratings, certified-bed
@@ -116,17 +118,30 @@ streamlit run app.py
 Then open the local URL and try CCN **`686123`** (Kendall Lakes Healthcare and
 Rehab Center, FL — the case study's validation facility).
 
+## Tests
+
+Network-free unit tests cover the field mapping, formatting, dynamic column
+resolution, report-row assembly, the branding guardrail, and PDF/Word rendering.
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
 ---
 
 ## Project structure
 
 ```
 medelite-facility-snapshot/
-├── app.py            # Streamlit UI (thin; no business logic)
-├── cms_client.py     # CMS Provider Data Catalog access + field mapping
-├── report.py         # PDF (fpdf2) + Word (python-docx) renderers
-├── assets/fonts/     # bundled Carlito (open-source Calibri-compatible PDF font)
+├── app.py              # Streamlit UI (thin; no business logic)
+├── cms_client.py       # CMS Provider Data Catalog access + field mapping
+├── report.py           # PDF (fpdf2) + Word (python-docx) renderers
+├── tests/              # network-free unit tests (pytest)
+├── assets/fonts/       # bundled Carlito (open-source Calibri-compatible PDF font)
+├── assets/screenshot.png
 ├── requirements.txt
+├── requirements-dev.txt
 └── README.md
 ```
 

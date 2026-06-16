@@ -268,9 +268,25 @@ def render_docx(snap: dict, manual: dict) -> bytes:
     st = _center(d.add_paragraph()); rs = st.add_run(snap.get("state", ""))
     rs.bold = True; rs.font.size = Pt(12)
 
+    sections = {0: "Facility Profile", 9: "CMS Star Ratings",
+                13: "Hospitalization & ED Metrics"}
     table = d.add_table(rows=0, cols=2)
     table.style = "Table Grid"
-    for label, value in rows:
+
+    # column header row (matches the PDF)
+    hc = table.add_row().cells
+    for cell, text in zip(hc, ("Field", "Value")):
+        _shade_cell(cell, "3993CB")
+        run = cell.paragraphs[0].add_run(text)
+        run.bold = True; run.font.size = Pt(9.5); run.font.color.rgb = RGBColor(255, 255, 255)
+
+    for i, (label, value) in enumerate(rows):
+        if i in sections:
+            sec = table.add_row().cells
+            sec[0].merge(sec[1])
+            _shade_cell(sec[0], "E6F1F9")
+            sr = sec[0].paragraphs[0].add_run(sections[i].upper())
+            sr.bold = True; sr.font.size = Pt(8); sr.font.color.rgb = RGBColor(*SECTION_TX)
         c = table.add_row().cells
         rl = c[0].paragraphs[0].add_run(label); rl.bold = True; rl.font.size = Pt(9.5)
         rv = c[1].paragraphs[0].add_run(str(value)); rv.font.size = Pt(9.5)
@@ -288,6 +304,18 @@ def render_docx(snap: dict, manual: dict) -> bytes:
 
     buf = io.BytesIO(); d.save(buf)
     return buf.getvalue()
+
+
+def _shade_cell(cell, hexcolor: str):
+    """Set a table cell's background fill (python-docx has no direct API)."""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), hexcolor)
+    cell._tc.get_or_add_tcPr().append(shd)
 
 
 def _add_hyperlink(paragraph, url: str, text: str, rgb):

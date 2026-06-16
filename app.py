@@ -11,6 +11,7 @@ The CMS API is called server-side here, so there is no browser CORS issue.
 
 import html
 import re
+from datetime import datetime
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -55,12 +56,19 @@ def _rating_band(v):
     return "r-na", "", "N/A"
 
 
+_OVERALL_VERDICT = {5: "Much above average", 4: "Above average", 3: "Average",
+                    2: "Below average", 1: "Much below average"}
+
+
 def _rating_cards_html(ratings):
     """Hero Overall card + the 3 component cards (color-coded by band)."""
-    ocls, ostars, oval = _rating_band(ratings.get("overall"))
+    ov = ratings.get("overall")
+    ocls, ostars, oval = _rating_band(ov)
+    verdict = _OVERALL_VERDICT.get(int(ov)) if str(ov).isdigit() else "Not rated"
     hero = (f"<div class='rating-hero {ocls}'>"
             f"<div><div class='hero-lab'>CMS Overall Rating</div>"
-            f"<div class='hero-val'>{oval}</div></div>"
+            f"<div class='hero-val'>{oval}</div>"
+            f"<div class='hero-verdict'>{verdict}</div></div>"
             f"<div class='hero-stars'>{ostars}</div></div>")
     comps = [("Health Insp.", "health_inspection"), ("Staffing", "staffing"),
              ("Quality of Care", "quality")]
@@ -180,6 +188,10 @@ st.markdown(
       .rating-hero.r-good .hero-stars { color:#0E9F6E; }
       .rating-hero.r-mid  .hero-stars { color:#E0A800; }
       .rating-hero.r-low  .hero-stars { color:#E5544B; }
+      .hero-verdict { font-size:12px; font-weight:700; margin-top:3px; }
+      .rating-hero.r-good .hero-verdict { color:#0E9F6E; }
+      .rating-hero.r-mid  .hero-verdict { color:#C28A00; }
+      .rating-hero.r-low  .hero-verdict { color:#D23B30; }
       .comp-cap { font-size:10.5px; color:#7b8a96; font-weight:700; letter-spacing:1px;
         text-transform:uppercase; margin:10px 0 4px; }
       .rating-grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:10px;
@@ -199,16 +211,24 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- CCN lookup --------------------------------------------------------------
-col_in, col_btn = st.columns([4, 1])
-with col_in:
-    ccn = st.text_input("CMS Certification Number (CCN)",
-                        placeholder="Enter a 6-character CCN (e.g. 455001)",
-                        max_chars=6).strip()
-with col_btn:
-    st.write("")
-    st.write("")
-    lookup = st.button("🔍 Fetch facility", use_container_width=True)
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_snapshot(ccn: str) -> dict:
+    """Cache live CMS lookups for an hour: re-querying the same CCN is instant
+    and we hit the CMS API less."""
+    return c.get_snapshot(ccn)
+
+
+# --- CCN lookup (in a form so Enter submits) ---------------------------------
+with st.form("ccn_lookup", border=False):
+    col_in, col_btn = st.columns([4, 1])
+    with col_in:
+        ccn = st.text_input("CMS Certification Number (CCN)",
+                            placeholder="Enter a 6-character CCN (e.g. 455001)",
+                            max_chars=6).strip()
+    with col_btn:
+        st.write("")
+        st.write("")
+        lookup = st.form_submit_button("🔍 Fetch facility", use_container_width=True)
 
 if lookup:
     if not re.fullmatch(r"[A-Za-z0-9]{6}", ccn):
@@ -216,7 +236,7 @@ if lookup:
     else:
         try:
             with st.spinner("Querying CMS Provider Data Catalog…"):
-                st.session_state["snap"] = c.get_snapshot(ccn)
+                st.session_state["snap"] = fetch_snapshot(ccn)
             st.session_state["ccn"] = ccn
         except c.FacilityNotFound:
             st.session_state.pop("snap", None)
@@ -246,6 +266,15 @@ if not snap:
         unsafe_allow_html=True,
     )
     st.stop()
+
+# data-freshness guard: CMS refreshes monthly; warn if the snapshot looks stale
+try:
+    _age = (datetime.now() - datetime.strptime(snap["processing_date"], "%Y-%m-%d")).days
+    if _age > 120:
+        st.warning(f"⚠️ This CMS data was last refreshed on {snap['processing_date']} "
+                   f"(~{_age // 30} months ago) — it may be out of date.")
+except (ValueError, KeyError, TypeError):
+    pass
 
 left, right = st.columns([1, 1.35], gap="large")
 
